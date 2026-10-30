@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ゴミ箱みまもり | 通知アプリ</title>
+  <style>
+    :root { --green:#06c755; --dark:#263b32; --muted:#87948d; --line:#e8eeea; --bg:#eff4f0; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; color:var(--dark); background:linear-gradient(135deg,#e9f6ec,#f8faf9); }
+    button, input { font:inherit; }
+    button { cursor:pointer; }
+    .app { max-width:1320px; min-height:720px; height:calc(100vh - 48px); margin:24px auto; display:grid; grid-template-columns:300px minmax(350px,1fr) 310px; overflow:hidden; background:white; border:1px solid #e4ece7; border-radius:20px; box-shadow:0 20px 60px #244b3520; }
+    .sidebar { border-right:1px solid var(--line); background:#fff; display:flex; flex-direction:column; min-width:0; }
+    .brand { display:flex; align-items:center; gap:12px; padding:26px 22px 24px; border-bottom:1px solid var(--line); }
+    .brand-logo { width:48px; height:48px; border-radius:16px; display:grid; place-items:center; color:#fff; background:var(--green); font-size:25px; }
+    .brand h1 { margin:0; font-size:19px; letter-spacing:.02em; }
+    .brand p { margin:4px 0 0; font-size:11px; color:var(--muted); }
+    .side-top { display:flex; align-items:center; justify-content:space-between; padding:20px 19px 13px; }
+    .side-top h2 { margin:0; font-size:15px; }
+    .count { background:#ebf9f0; color:#008b40; font-size:12px; border-radius:99px; padding:5px 9px; font-weight:bold; }
+    .bin-list { overflow:auto; flex:1; }
+    .bin-item { width:100%; text-align:left; display:flex; align-items:center; gap:11px; border:0; border-left:4px solid transparent; background:#fff; padding:15px 16px; }
+    .bin-item:hover { background:#f6faf7; }
+    .bin-item.active { background:#edf9f1; border-left-color:var(--green); }
+    .avatar { width:47px; height:47px; flex:none; display:grid; place-items:center; border-radius:17px; background:#e7f6ed; font-size:24px; }
+    .bin-text { flex:1; min-width:0; }
+    .bin-name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .bin-preview { margin-top:5px; color:#8a9690; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .bin-side { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+    .last-time { font-size:10px; color:#a2aaa6; white-space:nowrap; }
+    .unread { min-width:20px; height:20px; border-radius:20px; display:grid; place-items:center; padding:0 5px; color:white; font-size:11px; font-weight:bold; background:var(--green); }
+    .side-footer { border-top:1px solid var(--line); padding:17px 20px; color:#8d9a91; font-size:12px; }
+    .chat { display:flex; flex-direction:column; min-width:0; background:#f5f8f6; }
+    .chat-header { display:flex; align-items:center; gap:12px; min-height:86px; padding:17px 25px; background:white; border-bottom:1px solid var(--line); }
+    .chat-header .avatar { width:45px; height:45px; }
+    .chat-title { flex:1; min-width:0; }
+    .chat-title strong { display:block; font-size:17px; }
+    .status { display:flex; align-items:center; gap:6px; color:#85928b; font-size:12px; margin-top:5px; }
+    .dot { width:8px; height:8px; border-radius:50%; background:#b2bdb7; }
+    .dot.open { background:#ed9a2b; }
+    .permission { border:1px solid #c7e9d3; color:#008e40; border-radius:30px; background:white; font-size:12px; padding:9px 12px; white-space:nowrap; }
+    .permission:hover { background:#effbf3; }
+    .messages { flex:1; display:flex; flex-direction:column; gap:17px; overflow:auto; padding:25px 26px; }
+    .day-label { align-self:center; padding:5px 12px; border-radius:20px; background:#e6ece7; color:#8b9890; font-size:11px; }
+    .message { display:flex; gap:10px; align-items:flex-end; max-width:92%; }
+    .message .avatar { width:35px; height:35px; border-radius:13px; font-size:18px; background:white; }
+    .bubble { background:white; border:1px solid #e9f0eb; border-radius:16px 16px 16px 4px; padding:13px 16px; box-shadow:0 4px 12px #335e3c08; }
+    .bubble .alert-title { color:#df8237; font-weight:800; margin-bottom:5px; font-size:14px; }
+    .bubble p { font-size:13px; margin:0; line-height:1.7; }
+    .message-time { color:#a3ada6; font-size:10px; padding-bottom:4px; white-space:nowrap; }
+    .system-message { align-self:center; font-size:11px; color:#86958a; background:#eaf0eb; border-radius:20px; padding:7px 13px; text-align:center; }
+    .empty { margin:auto; text-align:center; color:#9baa9f; font-size:13px; line-height:1.8; }
+    .empty .big-icon { font-size:48px; display:block; margin-bottom:10px; opacity:.65; }
+    .chat-bottom { display:flex; align-items:center; gap:10px; padding:17px 24px; background:white; border-top:1px solid var(--line); color:#8b9990; font-size:12px; }
+    .chat-bottom .circle { color:var(--green); font-size:18px; }
+    .developer { background:#fbfdfb; border-left:1px solid var(--line); padding:24px 19px; overflow:auto; }
+    .dev-heading { display:flex; align-items:center; gap:9px; margin:0 0 9px; font-size:16px; }
+    .dev-subtitle { color:#839188; font-size:12px; line-height:1.8; margin:0 0 21px; }
+    .dev-label { color:#a0aaa4; font-size:11px; font-weight:700; margin-bottom:10px; letter-spacing:.1em; }
+    .control-list { display:flex; flex-direction:column; gap:10px; }
+    .control { padding:15px; background:white; border:1px solid var(--line); border-radius:14px; }
+    .control-main { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+    .control strong { font-size:13px; }
+    .control-state { margin-top:8px; font-size:11px; color:#97a29b; }
+    .control-state.open { color:#db8b2b; }
+    .switch { position:relative; display:inline-flex; width:45px; height:26px; flex:none; }
+    .switch input { position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+    .switch-track { background:#dce4de; width:100%; border-radius:99px; transition:background .2s; pointer-events:none; }
+    .switch-track:after { content:""; position:absolute; top:4px; left:4px; width:18px; height:18px; border-radius:50%; background:white; box-shadow:0 1px 4px #0002; transition:transform .2s; }
+    .switch input:checked + .switch-track { background:var(--green); }
+    .switch input:checked + .switch-track:after { transform:translateX(19px); }
+    .switch input:focus-visible + .switch-track { outline:3px solid #92ddaa; outline-offset:2px; }
+    .add-form { display:flex; gap:7px; margin-top:15px; }
+    .add-form input { flex:1; min-width:0; background:white; border:1px solid #d9e5dc; padding:10px; border-radius:9px; font-size:12px; outline-color:var(--green); }
+    .add-form button { border:0; color:white; background:var(--green); padding:0 11px; border-radius:9px; font-size:12px; font-weight:700; }
+    .dev-note { background:#edf9f1; border-radius:12px; padding:13px 14px; color:#587b62; font-size:11px; line-height:1.8; margin-top:22px; }
+    .reset { width:100%; background:none; color:#8b9790; border:1px solid #dce5df; padding:10px; border-radius:10px; font-size:12px; margin-top:15px; }
+    .reset:hover { background:#fff; }
+    .toast { position:fixed; z-index:50; right:26px; top:24px; display:flex; align-items:flex-start; gap:12px; max-width:350px; padding:15px 17px; border-radius:15px; box-shadow:0 12px 35px #244b3530; background:white; border-left:5px solid var(--green); animation:slide-in .25s ease-out; }
+    .toast[hidden] { display:none; }
+    .toast-icon { font-size:25px; }
+    .toast strong { display:block; font-size:14px; }
+    .toast p { color:#829188; font-size:12px; margin:5px 0 0; line-height:1.5; }
+    @keyframes slide-in { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
+    @media(max-width:1090px) { .app { grid-template-columns:260px minmax(300px,1fr); height:auto; min-height:0; margin:12px; } .chat { min-height:600px; } .developer { grid-column:1/-1; border-left:0; border-top:1px solid var(--line); } .control-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:650px) { .app { display:flex; flex-direction:column; margin:0; border-radius:0; border:0; } .brand { padding:16px; } .side-top { padding:12px 16px; } .bin-list { display:flex; overflow:auto; } .bin-item { min-width:190px; max-width:210px; border-left:0; border-bottom:3px solid transparent; padding:10px; } .bin-item.active { border-bottom-color:var(--green); } .side-footer { display:none; } .chat { min-height:490px; } .messages { min-height:340px; padding:16px; } .chat-header { padding:12px 16px; min-height:70px; } .permission { font-size:10px; padding:7px; } .developer { padding:18px 16px; } .control-list { grid-template-columns:1fr; } .toast { right:12px; left:12px; top:10px; max-width:none; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">♻</div>
+        <div><h1>ゴミ箱みまもり</h1><p>スマートゴミ箱 通知アプリ</p></div>
+      </div>
+      <div class="side-top"><h2>トーク</h2><span id="bin-count" class="count">4台を監視中</span></div>
+      <nav id="bin-list" class="bin-list" aria-label="ゴミ箱一覧"></nav>
+      <div class="side-footer">● ゴミ箱の開閉をリアルタイム風に確認</div>
+    </aside>
+
+    <main class="chat">
+      <header class="chat-header">
+        <div class="avatar">🗑️</div>
+        <div class="chat-title"><strong id="chat-name"></strong><div class="status"><span id="status-dot" class="dot"></span><span id="chat-status"></span></div></div>
+        <button id="permission-button" class="permission" type="button">🔔 通知を許可</button>
+      </header>
+      <section id="messages" class="messages" aria-label="開閉通知の履歴" aria-live="polite"></section>
+      <footer class="chat-bottom"><span class="circle">ⓘ</span> ゴミ箱が開くと、このトークに自動で通知が届きます</footer>
+    </main>
+
+    <aside class="developer">
+      <h2 class="dev-heading">⚙️ 開発者モード</h2>
+      <p class="dev-subtitle">ゴミ箱の開閉を疑似的に操作できます。スイッチをONにすると通知が届きます。</p>
+      <div class="dev-label">ゴミ箱の開閉スイッチ</div>
+      <div id="control-list" class="control-list"></div>
+      <form id="add-form" class="add-form">
+        <input id="new-bin-name" type="text" maxlength="30" placeholder="新しいゴミ箱の名前" aria-label="新しいゴミ箱の名前" required>
+        <button type="submit">＋ 追加</button>
+      </form>
+      <div class="dev-note">💡 これは画面と通知の動作確認用デモです。実際のセンサー連携には、ゴミ箱側の機器から開閉データを送信する仕組みが必要です。</div>
+      <button id="reset-button" class="reset" type="button">デモデータを初期化</button>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+    <span class="toast-icon">🔔</span><div><strong id="toast-title"></strong><p id="toast-text"></p></div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'trash-bin-demo-v1';
+    const initialBins = [
+      { id: 1, name: 'ゴミ箱①（研究室）', open: false, unread: 0 },
+      { id: 2, name: 'ゴミ箱②（廊下）', open: false, unread: 0 },
+      { id: 3, name: 'ゴミ箱③（玄関）', open: false, unread: 0 },
+      { id: 4, name: 'ゴミ箱④（休憩室）', open: false, unread: 0 }
+    ];
+
+    function loadData() {
+      try {
+        const value = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (value && Array.isArray(value.bins) && value.bins.length && Array.isArray(value.events)) return value;
+      } catch (error) { console.warn('保存データを読み込めません:', error); }
+      return { bins: initialBins.map(bin => ({ ...bin })), events: [], selectedId: 1 };
+    }
+
+    let data = loadData();
+    let toastTimer;
+    const byId = id => document.getElementById(id);
+    const selectedBin = () => data.bins.find(bin => bin.id === data.selectedId) || data.bins[0];
+    const eventsFor = id => data.events.filter(event => event.binId === id);
+    const timeText = iso => new Date(iso).toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' });
+    const dateText = iso => new Date(iso).toLocaleDateString('ja-JP', { month:'long', day:'numeric', weekday:'short' });
+    const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+    function renderBins() {
+      const container = byId('bin-list');
+      container.replaceChildren();
+      byId('bin-count').textContent = `${data.bins.length}台を監視中`;
+      data.bins.forEach(bin => {
+        const latest = eventsFor(bin.id).at(-1);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `bin-item${bin.id === data.selectedId ? ' active' : ''}`;
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar'; avatar.textContent = '🗑️';
+        const info = document.createElement('div'); info.className = 'bin-text';
+        const name = document.createElement('div'); name.className = 'bin-name'; name.textContent = bin.name;
+        const preview = document.createElement('div'); preview.className = 'bin-preview';
+        preview.textContent = latest ? (latest.open ? '🔔 ゴミ箱が開きました' : 'ゴミ箱が閉じました') : '通知はまだありません';
+        info.append(name, preview);
+        const side = document.createElement('div'); side.className = 'bin-side';
+        if (latest) { const time = document.createElement('span'); time.className = 'last-time'; time.textContent = timeText(latest.at); side.append(time); }
+        if (bin.unread) { const badge = document.createElement('span'); badge.className = 'unread'; badge.textContent = bin.unread > 99 ? '99+' : bin.unread; side.append(badge); }
+        button.append(avatar, info, side);
+        button.addEventListener('click', () => { data.selectedId = bin.id; bin.unread = 0; save(); render(); });
+        container.append(button);
+      });
+    }
+
+    function renderChat() {
+      const bin = selectedBin();
+      byId('chat-name').textContent = bin.name;
+      byId('chat-status').textContent = bin.open ? '現在：開いています' : '現在：閉じています';
+      byId('status-dot').classList.toggle('open', bin.open);
+      const container = byId('messages');
+      container.replaceChildren();
+      const events = eventsFor(bin.id);
+      if (!events.length) {
+        const empty = document.createElement('div'); empty.className = 'empty';
+        const picture = document.createElement('span'); picture.className = 'big-icon'; picture.textContent = '💬';
+        empty.append(picture, '通知はまだありません', document.createElement('br'), '開発者モードでゴミ箱を開いてみましょう');
+        container.append(empty);
+        return;
+      }
+      let lastDay = '';
+      events.forEach(event => {
+        const day = dateText(event.at);
+        if (day !== lastDay) {
+          const label = document.createElement('div'); label.className = 'day-label'; label.textContent = day;
+          container.append(label); lastDay = day;
+        }
+        if (!event.open) {
+          const system = document.createElement('div'); system.className = 'system-message';
+          system.textContent = `${timeText(event.at)}　ゴミ箱が閉じました`;
+          container.append(system);
+          return;
+        }
+        const row = document.createElement('div'); row.className = 'message';
+        const avatar = document.createElement('div'); avatar.className = 'avatar'; avatar.textContent = '🗑️';
+        const bubble = document.createElement('div'); bubble.className = 'bubble';
+        const heading = document.createElement('div'); heading.className = 'alert-title'; heading.textContent = '🔔 開閉通知';
+        const message = document.createElement('p'); message.textContent = `${bin.name} が開きました！`;
+        const time = document.createElement('span'); time.className = 'message-time'; time.textContent = timeText(event.at);
+        bubble.append(heading, message); row.append(avatar, bubble, time); container.append(row);
+      });
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function renderControls() {
+      const container = byId('control-list'); container.replaceChildren();
+      data.bins.forEach(bin => {
+        const card = document.createElement('div'); card.className = 'control';
+        const main = document.createElement('div'); main.className = 'control-main';
+        const title = document.createElement('strong'); title.textContent = bin.name;
+        const label = document.createElement('label'); label.className = 'switch';
+        const input = document.createElement('input'); input.type = 'checkbox'; input.checked = bin.open;
+        input.setAttribute('aria-label', `${bin.name} の開閉`);
+        const track = document.createElement('span'); track.className = 'switch-track';
+        input.addEventListener('change', () => setBinOpen(bin.id, input.checked));
+        label.append(input, track); main.append(title, label);
+        const state = document.createElement('div'); state.className = `control-state${bin.open ? ' open' : ''}`;
+        state.textContent = bin.open ? '● 開いている（ON）' : '● 閉じている（OFF）';
+        card.append(main, state); container.append(card);
+      });
+    }
+
+    function showToast(bin) {
+      byId('toast-title').textContent = 'ゴミ箱が開きました！';
+      byId('toast-text').textContent = `${bin.name} のふたが開きました。`;
+      byId('toast').hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { byId('toast').hidden = true; }, 4000);
+    }
+
+    function browserNotify(bin) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try { new Notification('🗑️ ゴミ箱の開閉通知', { body: `${bin.name} が開きました！` }); }
+        catch (error) { console.warn('ブラウザ通知に失敗しました:', error); }
+      }
+    }
+
+    function setBinOpen(id, isOpen) {
+      const bin = data.bins.find(item => item.id === id);
+      if (!bin || bin.open === isOpen) return;
+      bin.open = isOpen;
+      data.events.push({ binId: id, open: isOpen, at: new Date().toISOString() });
+      if (isOpen) {
+        if (data.selectedId !== id) bin.unread++;
+        showToast(bin);
+        browserNotify(bin);
+      }
+      save(); render();
+    }
+
+    function render() { renderBins(); renderChat(); renderControls(); }
+
+    byId('add-form').addEventListener('submit', event => {
+      event.preventDefault();
+      const input = byId('new-bin-name');
+      const name = input.value.trim();
+      if (!name) return;
+      const id = Math.max(0, ...data.bins.map(bin => bin.id)) + 1;
+      data.bins.push({ id, name, open:false, unread:0 });
+      data.selectedId = id;
+      input.value = '';
+      save(); render();
+    });
+
+    byId('permission-button').addEventListener('click', async () => {
+      if (!('Notification' in window)) { alert('このブラウザは通知に対応していません。画面内通知は利用できます。'); return; }
+      if (!window.isSecureContext) { alert('ブラウザ通知には HTTPS または localhost での起動が必要です。画面内通知は利用できます。'); return; }
+      const result = await Notification.requestPermission();
+      alert(result === 'granted' ? 'ブラウザ通知を許可しました。' : 'ブラウザ通知が許可されませんでした。画面内通知は利用できます。');
+      updatePermissionButton();
+    });
+
+    function updatePermissionButton() {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        byId('permission-button').textContent = '🔔 通知ON';
+      }
+    }
+
+    byId('reset-button').addEventListener('click', () => {
+      if (!confirm('ゴミ箱の追加内容と開閉履歴を初期化しますか？')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      data = { bins: initialBins.map(bin => ({ ...bin })), events: [], selectedId:1 };
+      byId('toast').hidden = true;
+      render();
+    });
+
+    updatePermissionButton();
+    render();
+  </script>
+</body>
+</html>
